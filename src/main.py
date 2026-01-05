@@ -1,7 +1,28 @@
+"""Mobile Kitchen - main UI module
+
+Lightweight Flet UI demonstrating a pantry list with expiration
+date picking and a simple quantity selector.
+
+Run:
+    pip install flet
+    python src/main.py
+
+This file contains the following high-level components:
+- Pantry: the main composite view
+- FoodItem: a single item control
+- DatePickerManager: helper to manage a DatePicker overlay
+- QuantityButtons: plus/minus quantity selector
+"""
+
 from datetime import date
 import flet as ft
 
 class Pantry(ft.Column):
+    """Pantry view composite.
+
+    Contains UI for adding pantry items, filtering by storage type,
+    selecting expiration dates, and choosing quantities.
+    """
     def __init__(self, page: ft.Page):
         super().__init__()
         self.page = page
@@ -27,6 +48,7 @@ class Pantry(ft.Column):
         self.items_left = ft.Text("0 items left")
         self.date_picker = DatePickerManager(self.page)
         self.quatity_selector=QuantityButtons(self.page)
+        self.item_category = ""
         
         self.controls = [
             ft.Column(
@@ -50,7 +72,8 @@ class Pantry(ft.Column):
                                     ft.Radio(value="fridge", label="Fridge"),
                                     ft.Radio(value="freezer",label="Freezer")
                                 ]
-                            )
+                            ),
+                            on_change=self.category_change
                        ),
                         
                         self.date_picker.get_ui(),
@@ -80,20 +103,20 @@ class Pantry(ft.Column):
         
     def add_clicked(self,e):
         if self.new_item.value:
-            item = FoodItem(self.new_item.value, self.quatity_selector.get_quantity, self.item_status_change, self.item_delete)
+            item = FoodItem(self.new_item.value, self.quatity_selector.get_quantity, self.item_category, self.item_delete)
             self.items.controls.append(item)
             self.new_item.value = ""
             self.new_item.focus()
             self.update()
     
     def before_update(self):
-        status = self.filter.tabs[self.filter.selected_index].text
+        current_tab = self.filter.tabs[self.filter.selected_index].text
         count = 0
         for item in self.items.controls:
             item.visible = (
-                status == "Pantry"
-                or (status == "Freezer")
-                or (status == "Fridge")
+                current_tab == "Pantry"
+                or (current_tab == "Freezer")
+                or (current_tab == "Fridge")
             )
             if not item.in_stock:
                 count += 1
@@ -107,8 +130,10 @@ class Pantry(ft.Column):
     def tabs_changed(self,e):
         self.update()
         
-    def item_status_change(self,e):
+    def category_change(self,e):
+        self.item_category=e.control.value
         self.update()
+        return self.item_category
         
     def item_delete(self, item):
         self.items.controls.remove(item)
@@ -116,6 +141,14 @@ class Pantry(ft.Column):
         
         
 class FoodItem(ft.Column):
+    """A single food item row with edit/delete and in-stock state.
+
+    Parameters
+    - item_name: label shown next to the checkbox
+    - quantity: initial quantity for display (not editable here)
+    - item_category: category string (pantry/fridge/freezer)
+    - item_delete: callback called when the item is deleted
+    """
     def __init__(self, item_name, quantity, item_category, item_delete):
         super().__init__()
         self.in_stock = False
@@ -124,7 +157,7 @@ class FoodItem(ft.Column):
         self.item_category = item_category
         self.item_delete = item_delete
         self.display_item = ft.Checkbox(
-            value=False, label=self.item_name, on_change=self.status_changed
+            value=False, label=self.item_name
         )
         self.edit_name = ft.TextField(expand=1)
         
@@ -133,6 +166,7 @@ class FoodItem(ft.Column):
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
             controls=[
                 self.display_item,
+                ft.Text(value=self.item_category),
                 ft.Row(
                     spacing=0,
                     controls=[
@@ -148,6 +182,7 @@ class FoodItem(ft.Column):
                         ),
                     ],
                 ),
+                
             ],
         )
         
@@ -165,12 +200,12 @@ class FoodItem(ft.Column):
                 ),
             ],
         )
-        self.controls = [self.display_item, self.edit_view] 
+        self.controls = [self.display_view, self.edit_view] 
         
-    def status_changed(self,e):
+    """def category_changed(self,e):
         self.in_stock = self.display_item.value
-        self.item_status_change()
-     
+        self.category_change()
+     """
     def edit_clicked(self, e):
         self.edit_name.value = self.display_item.label
         self.display_view.visible = False
@@ -187,6 +222,12 @@ class FoodItem(ft.Column):
         self.item_delete(self)   
 
 class DatePickerManager:
+    """Manage a DatePicker attached to the page overlay.
+
+    The manager creates the DatePicker control, appends it to
+    `page.overlay`, and exposes `get_ui()` which returns a small
+    control (icon + label) for insertion into other layouts.
+    """
     def __init__(self, page: ft.Page):
         self.page = page
         self.selected_date_text = ft.Text("Select Exp. Date")
@@ -230,6 +271,12 @@ class DatePickerManager:
         )
         
 class QuantityButtons(ft.Row):
+    """Simple quantity selector with plus/minus buttons.
+
+    Use `display_ui()` to obtain the Row to insert into layouts. The
+    control stores the `ft.Text` instance internally so its value can
+    be updated even when called from tests before mounting.
+    """
     def __init__(self, page: ft.Page = None, quantity: int = 0):
         super().__init__()
         self.page = page
@@ -293,6 +340,12 @@ class QuantityButtons(ft.Row):
         
             
 def main(page: ft.Page):
+    """Application entrypoint used by `ft.app()`.
+
+    The `page` object is supplied by Flet. This function builds the
+    top-level UI and starts the app. Keep this function small and
+    focused: heavy logic should live in helper classes above.
+    """
     page.adaptive = True
     page.add(ft.Text(value="Welcome to your kitchen"))
     page.horizontal_alignment=ft.CrossAxisAlignment.CENTER
