@@ -31,15 +31,19 @@ class Pantry(ft.Column):
         self.filter = ft.Tabs(
             selected_index=0,
             animation_duration=300,
+            on_change=self.tabs_changed,
             tabs=[
                 ft.Tab(
-                    text="Pantry"
+                    text="Pantry",
+                    
                 ),
                 ft.Tab(
-                    text="Fridge"
+                    text="Fridge",
+                    
                 ),
                 ft.Tab(
-                    text="Freezer"    
+                    text="Freezer",
+                    
                 ),
             ],
             expand=1
@@ -103,31 +107,28 @@ class Pantry(ft.Column):
         
     def add_clicked(self,e):
         if self.new_item.value:
-            item = FoodItem(self.new_item.value, self.quatity_selector.get_quantity, self.item_category, self.item_delete)
+            item = FoodItem(self.new_item.value, self.quatity_selector.get_quantity(), self.item_category, self.item_delete)
+            
             self.items.controls.append(item)
             self.new_item.value = ""
             self.new_item.focus()
             self.update()
     
     def before_update(self):
-        current_tab = self.filter.tabs[self.filter.selected_index].text
-        count = 0
+        current_tab = self.filter.tabs[self.filter.selected_index].text.lower()
         for item in self.items.controls:
             item.visible = (
-                current_tab == "Pantry"
-                or (current_tab == "Freezer")
-                or (current_tab == "Fridge")
+                item.item_category == current_tab
             )
-            if not item.in_stock:
-                count += 1
-        self.items_left.value = f"{count} active item(s) left"
-    
+            
+            
     def clear_clicked(self, e):
         for item in self.items.controls[:]:
             if item.in_stock:
                 self.item_delete(item)
     
     def tabs_changed(self,e):
+        
         self.update()
         
     def category_change(self,e):
@@ -159,7 +160,7 @@ class FoodItem(ft.Column):
         self.display_item = ft.Checkbox(
             value=False, label=self.item_name
         )
-        self.edit_name = ft.TextField(expand=1)
+        self.edit_item = ft.TextField(expand=1)
         
         self.display_view = ft.Row(
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -167,6 +168,7 @@ class FoodItem(ft.Column):
             controls=[
                 self.display_item,
                 ft.Text(value=self.item_category),
+                self.item_quantity,
                 ft.Row(
                     spacing=0,
                     controls=[
@@ -191,7 +193,7 @@ class FoodItem(ft.Column):
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
             controls=[
-                self.edit_name,
+                self.edit_item,
                 ft.IconButton(
                     icon=ft.Icons.DONE_OUTLINE_OUTLINED,
                     icon_color=ft.Colors.GREEN,
@@ -207,13 +209,13 @@ class FoodItem(ft.Column):
         self.category_change()
      """
     def edit_clicked(self, e):
-        self.edit_name.value = self.display_item.label
+        self.edit_item.value = self.display_item.label
         self.display_view.visible = False
         self.edit_view.visible = True
         self.update()
 
     def save_clicked(self, e):
-        self.display_item.label = self.edit_name.value
+        self.display_item.label = self.edit_item.value
         self.display_view.visible = True
         self.edit_view.visible = False
         self.update()
