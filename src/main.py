@@ -27,8 +27,12 @@ class Pantry(ft.Column):
         super().__init__()
         self.page = page
         self.new_item = ft.TextField(hint_text="What's in the pantry?", expand=True)
-        self.items = ft.Column()
+        self.items = ft.Column(
+            scroll=ft.ScrollMode.AUTO,
+            
+        )
         self.filter = ft.Tabs(
+            tab_alignment=ft.TabAlignment.CENTER,
             selected_index=0,
             animation_duration=300,
             on_change=self.tabs_changed,
@@ -46,30 +50,22 @@ class Pantry(ft.Column):
                     
                 ),
             ],
-            expand=1
+            expand_loose=1
         )
         
-        self.items_left = ft.Text("0 items left")
+        
+        
+        self.items_left = ft.Text("0 items")
         self.date_picker = DatePickerManager(self.page)
         self.quatity_selector=QuantityButtons(self.page)
         self.item_category = ""
         
-        self.controls = [
-            ft.Column(
-              controls=
-              [
-                ft.Row(
-                    controls=[
-                        self.new_item,
-                        ft.FloatingActionButton(
-                            icon=ft.Icons.ADD, on_click=self.add_clicked
-                        ),
-                    ],
-                ),
-                ft.Row(
-                    controls=
-                    [
-                        ft.RadioGroup(
+        self.add_item = ft.AlertDialog(
+            title=ft.Text("Add Item"),
+            content=ft.Column(
+                controls=[
+                    self.new_item,
+                    ft.RadioGroup(
                             content=ft.Row(
                                 [
                                     ft.Radio(value="pantry", label="Pantry"),
@@ -78,41 +74,69 @@ class Pantry(ft.Column):
                                 ]
                             ),
                             on_change=self.category_change
-                       ),
-                        
-                        self.date_picker.get_ui(),
-                        self.quatity_selector.display_ui(),
+                    ),
+                    self.date_picker.get_ui(),
+                    self.quatity_selector.display_ui(),
+                ],
+                tight=True,
+                scroll=ft.ScrollMode.ADAPTIVE
+            ),
+            actions=[
+                ft.TextButton("Add", on_click=self.add_clicked),
+                ft.TextButton("Cancel", on_click=self.close_dialog)
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+            modal=True,
+        )
+        
+        self.controls = [
+            
+            ft.Container(
+                expand=True,
+                content=ft.Column(
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    controls=[
+                        ft.Text(
+                            value="Welcome to your kitchen",
+                            text_align=ft.TextAlign.CENTER,
+                            size=20,
+                            ),
+                        self.filter,
+                        ft.Stack(
+                            expand=True,
+                            controls=[  
+                                ft.Container(
+                                    content=ft.FloatingActionButton(
+                                        icon=ft.Icons.ADD, on_click=self.add_button_clicked
+                                    ),
+                                    alignment=ft.alignment.bottom_right,
+                                    padding=ft.padding.all(16),
+                                ),
+                                self.items,
+                            ]
+                        ),
+                         
                     ],
                 ),
-              ],  
-            ),
-            ft.Column(
-                spacing=24,
-                controls=[
-                    self.filter,
-                    self.items,
-                    ft.Row(
-                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                        controls=[
-                            self.items_left,
-                            ft.OutlinedButton(
-                                text="Empty", on_click=self.clear_clicked
-                            ),
-                        ],
-                    ),
-                ],
             ),
         ]
         
+        
+    def close_dialog(self,e):
+        self.page.close(self.add_item)
+        
+    def add_button_clicked(self,e):
+        self.page.open(self.add_item)
+        
     def add_clicked(self,e):
         if self.new_item.value:
-            item = FoodItem(self.new_item.value, self.quatity_selector.get_quantity(), self.item_category, self.item_delete)
+            item = FoodItem(self.new_item.value, self.date_picker.get_date(), self.quatity_selector.get_quantity(), self.item_category, self.item_delete)
             
             self.items.controls.append(item)
             self.new_item.value = ""
             self.new_item.focus()
             self.update()
+            self.page.close(self.add_item)
     
     def before_update(self):
         current_tab = self.filter.tabs[self.filter.selected_index].text.lower()
@@ -150,24 +174,26 @@ class FoodItem(ft.Column):
     - item_category: category string (pantry/fridge/freezer)
     - item_delete: callback called when the item is deleted
     """
-    def __init__(self, item_name, quantity, item_category, item_delete):
+    def __init__(self, item_name, exp_date, quantity, item_category, item_delete):
         super().__init__()
         self.in_stock = False
         self.item_name = item_name
+        self.exp_date = exp_date
         self.item_quantity = quantity
         self.item_category = item_category
         self.item_delete = item_delete
         self.display_item = ft.Checkbox(
             value=False, label=self.item_name
         )
-        self.edit_item = ft.TextField(expand=1)
+        self.edit_item = ft.TextField()
+        self.edit_quantity = ft.TextField()
         
         self.display_view = ft.Row(
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
             controls=[
                 self.display_item,
-                ft.Text(value=self.item_category),
+                ft.Text(value=self.exp_date),
                 self.item_quantity,
                 ft.Row(
                     spacing=0,
@@ -194,6 +220,8 @@ class FoodItem(ft.Column):
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
             controls=[
                 self.edit_item,
+                ft.Text(value=self.item_category),
+                self.edit_quantity,
                 ft.IconButton(
                     icon=ft.Icons.DONE_OUTLINE_OUTLINED,
                     icon_color=ft.Colors.GREEN,
@@ -210,6 +238,7 @@ class FoodItem(ft.Column):
      """
     def edit_clicked(self, e):
         self.edit_item.value = self.display_item.label
+        self.edit_quantity.value = self.item_quantity.value
         self.display_view.visible = False
         self.edit_view.visible = True
         self.update()
@@ -259,6 +288,9 @@ class DatePickerManager:
     def open_date_picker(self, e):
         """Method to open the date picker dialog."""
         self.page.open(self.date_picker)
+    
+    def get_date(self):
+        return self.selected_date_text.value
 
     def get_ui(self):
         """Returns the UI components for the class to be added to the page."""
@@ -342,14 +374,14 @@ class QuantityButtons(ft.Row):
         
             
 def main(page: ft.Page):
-    """Application entrypoint used by `ft.app()`.
+    """Application entrypoint used by ft.app().
 
-    The `page` object is supplied by Flet. This function builds the
-    top-level UI and starts the app. Keep this function small and
-    focused: heavy logic should live in helper classes above.
+    The page object is supplied by Flet. This function builds the
+    top-level UI and starts the app.
     """
+    page.theme_mode = ft.ThemeMode.DARK
+    
     page.adaptive = True
-    page.add(ft.Text(value="Welcome to your kitchen"))
     page.horizontal_alignment=ft.CrossAxisAlignment.CENTER
     page.window.prevent_close = True
     
@@ -357,9 +389,23 @@ def main(page: ft.Page):
         if e.data == "close":
             page.window.prevent_close = False
             page.window.destroy()
-            
+    
+    page.theme = ft.Theme(
+        color_scheme=ft.ColorScheme(
+            background="#262626",
+            primary="#9B8769",
+            on_primary="#7F7369"
+        ),
+        floating_action_button_theme=ft.FloatingActionButtonTheme(
+            bgcolor="#7F7369",
+            foreground_color="#262626"
+        )
+    )
+    
+    page.update()      
     page.window.on_event = on_window_event
     pantry = Pantry(page)
+    pantry.expand = True
     page.add(pantry)
     page.update()
     
